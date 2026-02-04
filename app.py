@@ -1,51 +1,46 @@
 import streamlit as st
-from chatbot import YoutubeAssistant
-import config
+from chatbot import YouTubeAssistant
 
-# Initialize our logic class
-assistant = YoutubeAssistant()
+if 'assistant' not in st.session_state:
+    st.session_state.assistant = YouTubeAssistant()
+
+st.header('Your Own YouTube Assistant :smile:')
+
+url = st.sidebar.text_input('Enter the video URL ')
+
+if st.sidebar.button('Enter'):
+    video_id = url.split('v=')[-1] if 'v=' in url else url
+    if video_id:
+        st.sidebar.success(f'Got the video id {video_id}')
+        if 'video_id' not in st.session_state or st.session_state.video_id!=video_id:
+            st.session_state.video_id = video_id
+            st.session_state['transcript']=st.session_state.assistant.get_transcript(video_id)
+            st.session_state['vs']=st.session_state.assistant.create_vector_store(st.session_state['transcript'])
+            
+    else:    
+        st.sidebar.write('ID not found')
+st.sidebar.markdown('> Caution! This Assistant is not for Summarizing the whole video, it is just a Q/A bot')
 
 
-st.title("📹 YouTube Video Assistant")
 
-# Sidebar for Video Input
-video_url = st.sidebar.text_input("Enter YouTube Video URL")
-video_id = video_url.split("v=")[-1] if "v=" in video_url else video_url
+if 'chat_history' not in st.session_state:
+    st.session_state['chat_history'] = []
 
-if video_id:
-    # We use st.session_state so we don't re-index the video every time you ask a question
-    if 'vs' not in st.session_state or st.session_state.get('current_id') != video_id:
-        with st.spinner("Analyzing video content..."):
-            text = assistant.get_transcript(video_id)
-            if text:
-                st.session_state.vs = assistant.create_vector_store(text)
-                st.session_state.current_id = video_id
-                st.sidebar.success("Video indexed!")
-            else:
-                st.sidebar.error("Could not find a transcript for this video.")
+for chat in st.session_state.chat_history:
+    with st.chat_message(chat['role']):
+        st.markdown(chat['content'])
 
-# Chat History UI
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-# Handling User Input
-if user_query := st.chat_input("Ask a question about the video"):
+if user_input := st.chat_input('Enter your query regarding video'):
     if 'vs' in st.session_state:
-        # Display user message
-        st.session_state.chat_history.append({"role": "user", "content": user_query})
-        with st.chat_message("user"):
-            st.markdown(user_query)
+        st.session_state.chat_history.append({'role':'user', 'content': user_input})
+        
+        with st.chat_message('user'):
+            st.markdown(user_input)
 
-        # Generate and display response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                # Using your get_response method
-                response = assistant.get_response(user_query, st.session_state.vs)
+        with st.chat_message('assistant'):
+            with st.spinner('Thinking for you'):
+                response = st.session_state.assistant.get_response(user_input, st.session_state.vs)
                 st.markdown(response)
-                st.session_state.chat_history.append({"role": "assistant", "content": response})
+                st.session_state.chat_history.append({'role':'assistant', 'content':response})
     else:
-        st.warning("Please enter a valid YouTube link first.")
+        st.warning("Please Enter a valid ID or link 1st")
